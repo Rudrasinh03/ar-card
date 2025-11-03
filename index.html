@@ -1,125 +1,170 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>AR Video Auto Ratio with Camera Background</title>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AR Discount Card</title>
 
-    <!-- A-Frame + MindAR -->
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <!-- A-Frame + MindAR -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-    <style>
-      body, html {
-        margin: 0;
-        overflow: hidden;
-        height: 100%;
-        background: transparent;
-      }
-      #status {
-        position: fixed;
-        bottom: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        color: white;
-        font-family: sans-serif;
-        background: rgba(0, 0, 0, 0.5);
-        padding: 5px 12px;
-        border-radius: 8px;
-      }
-    </style>
-  </head>
+  <!-- 🎉 Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-  <body>
-    <div id="status">📷 Initializing...</div>
+  <style>
+    html, body { margin:0; height:100%; overflow:hidden; background:transparent; }
+    #status {
+      position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+      color: white; font-family: "Poppins", sans-serif;
+      background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 8px;
+      z-index: 9999; font-size: 14px;
+    }
+    #scratchContainer {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      width: 320px; height: 200px; border-radius: 20px;
+      display:none; z-index:9998; overflow:hidden;
+      background: linear-gradient(145deg, #1c1c1c, #2c2c2c);
+    }
+    #scratchCanvas { width:100%; height:100%; display:block; }
+    #rewardContent {
+      position: absolute; inset:0;
+      display:flex; justify-content:center; align-items:center; flex-direction:column;
+      background: linear-gradient(135deg,#ffd54f,#ffca28);
+      font-family: "Poppins", sans-serif; font-size:22px; color:#222; font-weight:600;
+    }
+    #rewardContent small { font-size:14px; margin-top:4px; color:#333; }
+    #revealMessage {
+      position: fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+      background: rgba(0,0,0,0.75); padding:20px 30px; border-radius:16px;
+      color:#fff; font-family:"Poppins",sans-serif; display:none; z-index:10000;
+      box-shadow: 0 4px 30px rgba(255,215,0,0.5);
+    }
+  </style>
+</head>
 
-    <a-scene
-      mindar-image="imageTargetSrc: targets (1).mind; autoStart: true;"
-      color-space="sRGB"
-      renderer="colorManagement: true; physicallyCorrectLights: false; alpha: true"
-      vr-mode-ui="enabled: false"
-      device-orientation-permission-ui="enabled: false"
-      embedded
-      background="transparent: true"
-    >
-      <a-assets>
-        <video
-          id="myVideo"
-          src="thank_you.mp4"
-          autoplay="false"
-          loop
-          preload="auto"
-          playsinline
-          webkit-playsinline
-          crossorigin="anonymous"
-        ></video>
-      </a-assets>
+<body>
+  <div id="status">📷 Initializing camera...</div>
+  <div id="scratchContainer">
+    <div id="rewardContent">
+      🎁 <span id="discountValue">--%</span> OFF!
+      <small>Show this at counter</small>
+    </div>
+    <canvas id="scratchCanvas"></canvas>
+  </div>
+  <div id="revealMessage"></div>
 
-      <!-- Camera feed is visible now -->
-      <a-camera look-controls="enabled: false" position="0 0 0"></a-camera>
+  <a-scene
+    mindar-image="imageTargetSrc: targets.mind; autoStart: true;"
+    color-space="sRGB" renderer="colorManagement:true;physicallyCorrectLights:false;alpha:true;"
+    vr-mode-ui="enabled:false" embedded>
+    <a-assets>
+      <video id="myVideo" src="test.mp4" loop="false" muted preload="auto" playsinline crossorigin="anonymous"></video>
+    </a-assets>
+    <a-camera look-controls="enabled:false"></a-camera>
+    <a-entity mindar-image-target="targetIndex: 0">
+      <a-video id="videoPlane" src="#myVideo" width="1" height="0.56" visible="false" material="shader:flat;"></a-video>
+    </a-entity>
+  </a-scene>
 
-      <a-entity mindar-image-target="targetIndex: 0">
-        <a-video
-          id="videoPlane"
-          src="#myVideo"
-          position="0 0 0"
-          rotation="0 0 0"
-          width="1"
-          height="0.56"
-          visible="false"
-        ></a-video>
-      </a-entity>
-    </a-scene>
+  <script>
+    const backendURL = "https://script.google.com/macros/s/AKfycbwjocMCayXfRv4LDPXszTwmRhPCcE1fFv1O7w1PKwLuhWGvRCHkqO8OuY4BDvnjo_a9/exec";
 
-    <script>
-      const scene = document.querySelector("a-scene");
-      const video = document.querySelector("#myVideo");
-      const plane = document.querySelector("#videoPlane");
-      const status = document.getElementById("status");
+    const video = document.querySelector("#myVideo");
+    const plane = document.querySelector("#videoPlane");
+    const status = document.querySelector("#status");
+    const scratchContainer = document.querySelector("#scratchContainer");
+    const scratchCanvas = document.querySelector("#scratchCanvas");
+    const rewardContent = document.querySelector("#rewardContent");
+    const discountSpan = document.querySelector("#discountValue");
+    const revealMessage = document.querySelector("#revealMessage");
+    const ctx = scratchCanvas.getContext("2d");
+    let targetVisible = false;
 
-      // 🧠 Auto video ratio
-      video.addEventListener("loadedmetadata", () => {
-        const videoWidth = video.videoWidth;
-        const videoHeight = video.videoHeight;
+    document.querySelector("a-scene").addEventListener("targetFound", async () => {
+      targetVisible = true;
+      plane.setAttribute("visible", true);
+      try { await video.play(); } catch {}
+      status.innerText = "🎬 Target found — playing video...";
+    });
 
-        if (videoWidth && videoHeight) {
-          const aspectRatio = videoWidth / videoHeight;
+    document.querySelector("a-scene").addEventListener("targetLost", () => {
+      targetVisible = false;
+      video.pause();
+      plane.setAttribute("visible", false);
+      status.innerText = "📷 Hold steady to keep AR visible";
+    });
 
-          if (aspectRatio >= 1) {
-            plane.setAttribute("width", 1);
-            plane.setAttribute("height", 1 / aspectRatio);
-          } else {
-            plane.setAttribute("height", 1);
-            plane.setAttribute("width", aspectRatio);
-          }
+    // Scratch logic setup
+    function setupScratch() {
+      const rect = scratchContainer.getBoundingClientRect();
+      scratchCanvas.width = rect.width;
+      scratchCanvas.height = rect.height;
+      ctx.globalCompositeOperation = "source-over";
+      const gradient = ctx.createLinearGradient(0,0,rect.width,rect.height);
+      gradient.addColorStop(0,"#c0a757"); gradient.addColorStop(1,"#b49e49");
+      ctx.fillStyle = gradient; ctx.fillRect(0,0,rect.width,rect.height);
+      ctx.font = "bold 18px Poppins"; ctx.fillStyle = "#111";
+      ctx.textAlign = "center"; ctx.fillText("✨ Scratch to Reveal ✨", rect.width/2, rect.height/2);
+    }
 
-          console.log(`Video ratio: ${aspectRatio.toFixed(2)} (${aspectRatio >= 1 ? "Landscape" : "Portrait"})`);
+    let scratching=false, revealed=false;
+    ["mousedown","touchstart"].forEach(e=>scratchCanvas.addEventListener(e,()=>scratching=true));
+    ["mouseup","mouseleave","touchend"].forEach(e=>scratchCanvas.addEventListener(e,()=>scratching=false));
+    scratchCanvas.addEventListener("mousemove",e=>{ if(scratching) scratch(e.clientX,e.clientY); });
+    scratchCanvas.addEventListener("touchmove",e=>{
+      if(!scratching) return;
+      const t=e.touches[0]; scratch(t.clientX,t.clientY); e.preventDefault();
+    });
+
+    function scratch(x,y){
+      const rect = scratchCanvas.getBoundingClientRect();
+      const localX = x - rect.left, localY = y - rect.top;
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.beginPath(); ctx.arc(localX,localY,25,0,Math.PI*2); ctx.fill();
+    }
+
+    // Fetch discount from backend when video ends
+    video.addEventListener("ended", async ()=>{
+      status.innerText = "🎁 Checking your reward...";
+      const qrParam = new URLSearchParams(window.location.search);
+      const token = qrParam.get("token") || "CARD0001"; // fallback for testing
+
+      try {
+        const res = await fetch(`${backendURL}?token=${token}`);
+        const data = await res.json();
+        console.log("Backend Response:", data);
+
+        if(data.success){
+          discountSpan.innerText = data.discount || "5%";
+          rewardContent.innerHTML = `🎉 You got ${data.discount}!<small>${data.offer}</small>`;
+          scratchContainer.style.display = "block";
+          setupScratch();
+          revealed = false;
+        } else {
+          rewardContent.innerHTML = `😅 Already used!<small>Better luck next time</small>`;
+          scratchContainer.style.display = "block";
+          setupScratch();
         }
-      });
+      } catch(err){
+        console.error(err);
+        rewardContent.innerHTML = "⚠️ Error connecting backend!";
+        scratchContainer.style.display = "block";
+      }
+    });
 
-      scene.addEventListener("arReady", () => {
-        status.innerText = "✅ Point camera at your target";
-      });
-
-      scene.addEventListener("targetFound", async () => {
-        console.log("Target Found");
-        status.innerText = "🎬 Playing video...";
-        plane.setAttribute("visible", true);
-        try {
-          await video.play();
-        } catch (err) {
-          console.warn("Autoplay blocked", err);
-          video.muted = true;
-          await video.play();
-        }
-      });
-
-      scene.addEventListener("targetLost", () => {
-        console.log("Target Lost");
-        status.innerText = "❌ Target lost, hold camera steady";
-        video.pause();
-        plane.setAttribute("visible", false);
-      });
-    </script>
-  </body>
+    // Confetti when scratched enough
+    scratchCanvas.addEventListener("mouseup",()=>{
+      if(!revealed){
+        revealed=true;
+        setTimeout(()=>{
+          scratchContainer.style.display="none";
+          revealMessage.innerHTML = "🎊 Congrats! Show this at counter!";
+          revealMessage.style.display="block";
+          confetti({particleCount:80,spread:60,origin:{y:0.6}});
+        },800);
+      }
+    });
+  </script>
+</body>
 </html>
