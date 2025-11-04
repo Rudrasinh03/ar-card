@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AR Thank You Card</title>
+  <title>AR Thank You Card + Discount</title>
 
   <!-- A-Frame + MindAR -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    body, html { margin:0; height:100%; overflow:hidden; }
+    body, html { margin:0; height:100%; overflow:hidden; font-family: Poppins, sans-serif; }
+
     #status {
       position: fixed;
       bottom: 10px;
@@ -20,16 +21,42 @@
       background: rgba(0,0,0,0.6);
       padding: 6px 12px;
       border-radius: 8px;
-      font-family: Poppins, sans-serif;
       font-size: 14px;
       z-index: 10;
     }
+
+    /* Overlay for scratch card or no discount */
+    #overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      display: none;
+      align-items: center; justify-content: center; flex-direction: column;
+      background: rgba(0,0,0,0.8);
+      z-index: 999;
+      text-align: center;
+    }
+
+    #scratch-card {
+      width: 250px; height: 150px;
+      background: gold;
+      border-radius: 15px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; color: black; font-weight: bold;
+    }
+
+    #no-discount {
+      font-size: 22px;
+      color: #ff4444;
+      display: none;
+    }
+
   </style>
 </head>
 
 <body>
   <div id="status">📷 Initializing camera...</div>
 
+  <!-- AR Scene -->
   <a-scene mindar-image="imageTargetSrc: targets (1).mind; autoStart: true;"
            color-space="sRGB"
            renderer="colorManagement:true;alpha:true;"
@@ -44,15 +71,46 @@
     </a-entity>
   </a-scene>
 
+  <!-- Overlay -->
+  <div id="overlay">
+    <div id="scratch-card">🎁 You won 20% OFF!</div>
+    <div id="no-discount">😔 Sorry, no discount this time</div>
+  </div>
+
   <script>
     const status = document.querySelector("#status");
     const video = document.querySelector("#thankyou");
     const videoPlane = document.querySelector("a-video");
+    const overlay = document.querySelector("#overlay");
+    const scratchCard = document.querySelector("#scratch-card");
+    const noDiscount = document.querySelector("#no-discount");
+
+    // Track scan count using localStorage
+    let scanCount = parseInt(localStorage.getItem("scan_count")) || 0;
 
     document.querySelector("a-scene").addEventListener("targetFound", () => {
       videoPlane.setAttribute("visible", true);
       video.play();
       status.textContent = "🎬 Target found! Playing video...";
+
+      // After 10 seconds, stop video and show discount logic
+      setTimeout(() => {
+        video.pause();
+        videoPlane.setAttribute("visible", false);
+        overlay.style.display = "flex";
+
+        if (scanCount === 0) {
+          scratchCard.style.display = "flex";
+          noDiscount.style.display = "none";
+        } else {
+          scratchCard.style.display = "none";
+          noDiscount.style.display = "block";
+        }
+
+        // Increase scan count
+        scanCount++;
+        localStorage.setItem("scan_count", scanCount);
+      }, 10000);
     });
 
     document.querySelector("a-scene").addEventListener("targetLost", () => {
