@@ -58,6 +58,12 @@
   <a-scene mindar-image="imageTargetSrc: targets (1).mind; autoStart: true;"
            color-space="sRGB" renderer="colorManagement:true;physicallyCorrectLights:false;alpha:true;"
            vr-mode-ui="enabled:false" embedded>
+    <script>
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(() => console.log("✅ Camera access granted"))
+    .catch(err => alert("⚠️ Please allow camera access to view the AR experience."));
+</script>
+
     <a-assets>
       <video id="myVideo" src="thank_you.mp4" loop="false" muted preload="auto" playsinline crossorigin="anonymous"></video>
     </a-assets>
@@ -183,3 +189,4 @@
   </script>
 </body>
 </html>
+
