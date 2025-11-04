@@ -9,16 +9,15 @@
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-  <!-- 🎉 Confetti -->
+  <!-- Confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <style>
-    html, body { margin:0; height:100%; overflow:hidden; background:transparent; }
+    html, body { margin:0; height:100%; overflow:hidden; background:transparent; font-family:"Poppins",sans-serif; }
     #status {
       position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
-      color: white; font-family: "Poppins", sans-serif;
-      background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 8px;
-      z-index: 9999; font-size: 14px;
+      color: white; font-size:14px; background: rgba(0,0,0,0.5);
+      padding:6px 12px; border-radius:8px; z-index:9999;
     }
     #scratchContainer {
       position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
@@ -28,16 +27,15 @@
     }
     #scratchCanvas { width:100%; height:100%; display:block; }
     #rewardContent {
-      position: absolute; inset:0;
-      display:flex; justify-content:center; align-items:center; flex-direction:column;
+      position: absolute; inset:0; display:flex; justify-content:center; align-items:center; flex-direction:column;
       background: linear-gradient(135deg,#ffd54f,#ffca28);
-      font-family: "Poppins", sans-serif; font-size:22px; color:#222; font-weight:600;
+      font-size:22px; color:#222; font-weight:600;
     }
     #rewardContent small { font-size:14px; margin-top:4px; color:#333; }
     #revealMessage {
       position: fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-      background: rgba(0,0,0,0.75); padding:20px 30px; border-radius:16px;
-      color:#fff; font-family:"Poppins",sans-serif; display:none; z-index:10000;
+      background: rgba(0,0,0,0.8); padding:20px 30px; border-radius:16px;
+      color:#fff; display:none; z-index:10000; text-align:center;
       box-shadow: 0 4px 30px rgba(255,215,0,0.5);
     }
   </style>
@@ -45,6 +43,7 @@
 
 <body>
   <div id="status">📷 Initializing camera...</div>
+
   <div id="scratchContainer">
     <div id="rewardContent">
       🎁 <span id="discountValue">--%</span> OFF!
@@ -52,14 +51,15 @@
     </div>
     <canvas id="scratchCanvas"></canvas>
   </div>
+
   <div id="revealMessage"></div>
 
-  <a-scene
-    mindar-image="imageTargetSrc: targets.mind; autoStart: true;"
-    color-space="sRGB" renderer="colorManagement:true;physicallyCorrectLights:false;alpha:true;"
-    vr-mode-ui="enabled:false" embedded>
+  <!-- AR Scene -->
+  <a-scene mindar-image="imageTargetSrc: targets (1).mind; autoStart: true;"
+           color-space="sRGB" renderer="colorManagement:true;physicallyCorrectLights:false;alpha:true;"
+           vr-mode-ui="enabled:false" embedded>
     <a-assets>
-      <video id="myVideo" src="test.mp4" loop="false" muted preload="auto" playsinline crossorigin="anonymous"></video>
+      <video id="myVideo" src="thank_you.mp4" loop="false" muted preload="auto" playsinline crossorigin="anonymous"></video>
     </a-assets>
     <a-camera look-controls="enabled:false"></a-camera>
     <a-entity mindar-image-target="targetIndex: 0">
@@ -68,7 +68,7 @@
   </a-scene>
 
   <script>
-    const backendURL = "https://script.google.com/macros/s/AKfycbwjocMCayXfRv4LDPXszTwmRhPCcE1fFv1O7w1PKwLuhWGvRCHkqO8OuY4BDvnjo_a9/exec";
+    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbx7TXqItCLthQCxgvI2oKGeHDuKubht7Xqq-pLb0o2zcnVGUVPFXqLitQ0TYQUaUeWO/exec";
 
     const video = document.querySelector("#myVideo");
     const plane = document.querySelector("#videoPlane");
@@ -79,8 +79,14 @@
     const discountSpan = document.querySelector("#discountValue");
     const revealMessage = document.querySelector("#revealMessage");
     const ctx = scratchCanvas.getContext("2d");
-    let targetVisible = false;
 
+    let scratching = false, revealed = false, targetVisible = false;
+
+    // Get card ID from URL
+    const params = new URLSearchParams(window.location.search);
+    const cardId = params.get("id") || "CARD0001";
+
+    // AR target events
     document.querySelector("a-scene").addEventListener("targetFound", async () => {
       targetVisible = true;
       plane.setAttribute("visible", true);
@@ -95,73 +101,82 @@
       status.innerText = "📷 Hold steady to keep AR visible";
     });
 
-    // Scratch logic setup
+    // Scratch setup
     function setupScratch() {
       const rect = scratchContainer.getBoundingClientRect();
       scratchCanvas.width = rect.width;
       scratchCanvas.height = rect.height;
       ctx.globalCompositeOperation = "source-over";
       const gradient = ctx.createLinearGradient(0,0,rect.width,rect.height);
-      gradient.addColorStop(0,"#c0a757"); gradient.addColorStop(1,"#b49e49");
-      ctx.fillStyle = gradient; ctx.fillRect(0,0,rect.width,rect.height);
-      ctx.font = "bold 18px Poppins"; ctx.fillStyle = "#111";
-      ctx.textAlign = "center"; ctx.fillText("✨ Scratch to Reveal ✨", rect.width/2, rect.height/2);
+      gradient.addColorStop(0,"#c0a757");
+      gradient.addColorStop(1,"#b49e49");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0,0,rect.width,rect.height);
+      ctx.font = "bold 18px Poppins";
+      ctx.fillStyle = "#111";
+      ctx.textAlign = "center";
+      ctx.fillText("✨ Scratch to Reveal ✨", rect.width/2, rect.height/2);
     }
 
-    let scratching=false, revealed=false;
-    ["mousedown","touchstart"].forEach(e=>scratchCanvas.addEventListener(e,()=>scratching=true));
-    ["mouseup","mouseleave","touchend"].forEach(e=>scratchCanvas.addEventListener(e,()=>scratching=false));
-    scratchCanvas.addEventListener("mousemove",e=>{ if(scratching) scratch(e.clientX,e.clientY); });
-    scratchCanvas.addEventListener("touchmove",e=>{
+    // Scratch events
+    ["mousedown","touchstart"].forEach(e => scratchCanvas.addEventListener(e,()=>scratching=true));
+    ["mouseup","mouseleave","touchend"].forEach(e => scratchCanvas.addEventListener(e,()=>scratching=false));
+    scratchCanvas.addEventListener("mousemove", e => { if(scratching) scratch(e.clientX,e.clientY); });
+    scratchCanvas.addEventListener("touchmove", e => {
       if(!scratching) return;
-      const t=e.touches[0]; scratch(t.clientX,t.clientY); e.preventDefault();
+      const t = e.touches[0];
+      scratch(t.clientX, t.clientY);
+      e.preventDefault();
     });
 
     function scratch(x,y){
       const rect = scratchCanvas.getBoundingClientRect();
       const localX = x - rect.left, localY = y - rect.top;
       ctx.globalCompositeOperation = "destination-out";
-      ctx.beginPath(); ctx.arc(localX,localY,25,0,Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      ctx.arc(localX, localY, 25, 0, Math.PI*2);
+      ctx.fill();
     }
 
-    // Fetch discount from backend when video ends
+    // Fetch reward after video ends
     video.addEventListener("ended", async ()=>{
       status.innerText = "🎁 Checking your reward...";
-      const qrParam = new URLSearchParams(window.location.search);
-      const token = qrParam.get("token") || "CARD0001"; // fallback for testing
-
       try {
-        const res = await fetch(`${backendURL}?token=${token}`);
+        const res = await fetch(`${BACKEND_URL}?id=${encodeURIComponent(cardId)}`);
         const data = await res.json();
         console.log("Backend Response:", data);
 
-        if(data.success){
-          discountSpan.innerText = data.discount || "5%";
-          rewardContent.innerHTML = `🎉 You got ${data.discount}!<small>${data.offer}</small>`;
+        if (data.status === "ok" && data.reward && !data.usedBefore) {
+          discountSpan.innerText = data.reward;
+          rewardContent.innerHTML = `🎉 You got ${data.reward}!<small>${data.offer || "Show this at counter"}</small>`;
           scratchContainer.style.display = "block";
           setupScratch();
           revealed = false;
-        } else {
+        } else if (data.usedBefore) {
           rewardContent.innerHTML = `😅 Already used!<small>Better luck next time</small>`;
           scratchContainer.style.display = "block";
           setupScratch();
+        } else {
+          rewardContent.innerHTML = `⚠️ No reward found`;
+          scratchContainer.style.display = "block";
+          setupScratch();
         }
-      } catch(err){
+      } catch (err) {
         console.error(err);
         rewardContent.innerHTML = "⚠️ Error connecting backend!";
         scratchContainer.style.display = "block";
       }
     });
 
-    // Confetti when scratched enough
-    scratchCanvas.addEventListener("mouseup",()=>{
+    // Reveal confetti
+    scratchCanvas.addEventListener("mouseup", ()=>{
       if(!revealed){
-        revealed=true;
+        revealed = true;
         setTimeout(()=>{
-          scratchContainer.style.display="none";
+          scratchContainer.style.display = "none";
           revealMessage.innerHTML = "🎊 Congrats! Show this at counter!";
-          revealMessage.style.display="block";
-          confetti({particleCount:80,spread:60,origin:{y:0.6}});
+          revealMessage.style.display = "block";
+          confetti({particleCount:100,spread:70,origin:{y:0.6}});
         },800);
       }
     });
