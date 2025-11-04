@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AR Thank You Card + Discount</title>
+  <title>AR Thank You Card + Discount (Per QR Fixed)</title>
 
   <!-- A-Frame + MindAR -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -25,13 +25,12 @@
       z-index: 10;
     }
 
-    /* Overlay for scratch card or no discount */
     #overlay {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
       display: none;
       align-items: center; justify-content: center; flex-direction: column;
-      background: rgba(0,0,0,0.8);
+      background: rgba(0,0,0,0.85);
       z-index: 999;
       text-align: center;
     }
@@ -49,14 +48,12 @@
       color: #ff4444;
       display: none;
     }
-
   </style>
 </head>
 
 <body>
   <div id="status">📷 Initializing camera...</div>
 
-  <!-- AR Scene -->
   <a-scene mindar-image="imageTargetSrc: targets (1).mind; autoStart: true;"
            color-space="sRGB"
            renderer="colorManagement:true;alpha:true;"
@@ -71,7 +68,6 @@
     </a-entity>
   </a-scene>
 
-  <!-- Overlay -->
   <div id="overlay">
     <div id="scratch-card">🎁 You won 20% OFF!</div>
     <div id="no-discount">😔 Sorry, no discount this time</div>
@@ -85,15 +81,19 @@
     const scratchCard = document.querySelector("#scratch-card");
     const noDiscount = document.querySelector("#no-discount");
 
-    // Track scan count using localStorage
-    let scanCount = parseInt(localStorage.getItem("scan_count")) || 0;
+    // Extract card ID from URL (?id=QR001)
+    const urlParams = new URLSearchParams(window.location.search);
+    const cardId = urlParams.get("id") || "default";
+
+    // Use card-specific key
+    const scanKey = `scan_count_${cardId}`;
+    let scanCount = parseInt(localStorage.getItem(scanKey)) || 0;
 
     document.querySelector("a-scene").addEventListener("targetFound", () => {
       videoPlane.setAttribute("visible", true);
       video.play();
       status.textContent = "🎬 Target found! Playing video...";
 
-      // After 10 seconds, stop video and show discount logic
       setTimeout(() => {
         video.pause();
         videoPlane.setAttribute("visible", false);
@@ -107,9 +107,9 @@
           noDiscount.style.display = "block";
         }
 
-        // Increase scan count
+        // Save scan record
         scanCount++;
-        localStorage.setItem("scan_count", scanCount);
+        localStorage.setItem(scanKey, scanCount);
       }, 10000);
     });
 
