@@ -93,12 +93,14 @@
 
     <!-- AR Scene (Black Background) -->
     <a-scene
-      mindar-image="imageTargetSrc: targets (1).mind; autoStart: true;"
-      color-space="sRGB"
-      renderer="colorManagement: true; alpha: false; clearColor: black;"
-      vr-mode-ui="enabled: false"
-      embedded
-    >
+  mindar-image="imageTargetSrc: targets (1).mind; autoStart: true;"
+  color-space="sRGB"
+  renderer="colorManagement: true; alpha: true;"
+  vr-mode-ui="enabled: false"
+  embedded
+>
+
+  
       <a-assets>
         <video id="myVideo" src="thank_you.mp4" loop muted preload="auto" playsinline></video>
       </a-assets>
@@ -208,3 +210,4 @@
     </script>
   </body>
 </html>
+
