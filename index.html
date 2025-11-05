@@ -1,91 +1,227 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>AR Video with Camera Background</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AR Discount Experience</title>
 
-    <!-- A-Frame + MindAR -->
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+        <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-    <style>
-      html, body {
-        margin: 0;
-        height: 100%;
-        overflow: hidden;
-        background: transparent;
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: transparent; 
+        font-family: "Poppins", sans-serif;
+      }
+      
+      /* --- Visual Styles --- */
+      #title-bar {
+        position: fixed; top: 0; left: 0;
+        width: 100%; height: 50px; line-height: 50px;
+        background: rgba(0, 0, 0, 0.7);
+        color: #ffd700;
+        text-align: center; z-index: 9999; 
+        font-weight: 600; font-size: 18px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
       }
-      #status {
-        position: fixed;
-        bottom: 10px;
-        left: 50%;
+
+      #loading {
+        position: fixed; top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.9); 
+        display: flex; justify-content: center; align-items: center;
+        flex-direction: column; text-align: center;
+        color: #ffd700; font-size: 16px; z-index: 10000;
+      }
+      
+      #loading::after {
+        content: ""; display: block; margin: 12px auto 0;
+        width: 40px; height: 40px;
+        border: 4px solid rgba(255, 215, 0, 0.3);
+        border-top-color: #ffd700; border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+      
+      #status {
+        position: fixed; bottom: 15px; left: 50%;
         transform: translateX(-50%);
-        color: white;
-        font-family: sans-serif;
-        background: rgba(0, 0, 0, 0.5);
-        padding: 6px 12px;
-        border-radius: 8px;
-      }
-    </style>
-  </head>
+        color: white; background: rgba(0, 0, 0, 0.7); 
+        padding: 8px 18px; border-radius: 10px; font-size: 14px;
+        backdrop-filter: blur(6px); z-index: 9999;
+        border: 1px solid #ffd700; text-shadow: none;
+      }
+      
+      /* --- Scratch Card Styles --- */
+      #scratchCardContainer {
+        position: fixed; top: 0; left: 0;
+        width: 100%; height: 100%;
+        display: none; justify-content: center; align-items: center;
+        background: radial-gradient(circle at center, #0a0a0a 60%, #000 100%);
+        z-index: 10000; animation: fadeIn 0.6s ease-in-out forwards;
+      }
+      
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-  <body>
-    <div id="status">📷 Initializing camera...</div>
+      #scratchCard {
+        width: 320px; height: 190px;
+        background: linear-gradient(145deg, #000, #111);
+        border: 1px solid rgba(255, 215, 0, 0.6);
+        border-radius: 18px; position: relative;
+        box-shadow: 0 0 40px rgba(255, 215, 0, 0.3); overflow: hidden;
+      }
 
-    <a-scene
-      mindar-image="imageTargetSrc: targets (1).mind; autoStart: true;"
-      color-space="sRGB"
-      renderer="colorManagement: true, physicallyCorrectLights: false, alpha: true"
-      vr-mode-ui="enabled: false"
-      device-orientation-permission-ui="enabled: false"
-      embedded
-      style="background: transparent;"
-    >
-      <a-assets>
-        <video id="myVideo" src="thank_you.mp4" loop preload="auto" playsinline webkit-playsinline></video>
-      </a-assets>
+      #discountText {
+        color: #ffd700; font-size: 26px; text-align: center;
+        font-weight: 600; text-shadow: 0 0 12px #ffd700; padding-top: 70px;
+      }
 
-      <a-camera look-controls="enabled: false"></a-camera>
+      canvas#scratchLayer {
+        position: absolute; top: 0; left: 0;
+        width: 100%; height: 100%; border-radius: 18px;
+      }
+    </style>
+  </head>
 
-      <a-entity mindar-image-target="targetIndex: 0">
-        <a-video id="videoPlane" src="#myVideo" width="1" height="0.56" position="0 0 0" visible="false"></a-video>
-      </a-entity>
-    </a-scene>
+  <body>
+    
+        <a-scene
+      mindar-image="imageTargetSrc: targets (1).mind; autoStart: true;"
+      color-space="sRGB"
+      renderer="colorManagement: true; alpha: false;"       vr-mode-ui="enabled: false"
+      embedded
+    >
+      <a-assets>
+        <video id="thankYouVideo" src="thank_you.mp4" loop muted playsinline crossorigin="anonymous"></video>
+      </a-assets>
 
-    <script>
-      const scene = document.querySelector("a-scene");
-      const video = document.querySelector("#myVideo");
-      const plane = document.querySelector("#videoPlane");
-      const status = document.getElementById("status");
+      <a-camera look-controls="enabled: false"></a-camera>
 
-      // Auto adjust video ratio
-      video.addEventListener("loadedmetadata", () => {
-        const aspect = video.videoWidth / video.videoHeight;
-        plane.setAttribute("width", 1);
-        plane.setAttribute("height", 1 / aspect);
-      });
+      <a-entity mindar-image-target="targetIndex: 0" id="target">
+        <a-video id="videoPlane" 
+          src="#thankYouVideo" 
+          width="1.2" height="0.675"
+          position="0 0 0.01" 
+          rotation="-90 180 0" visible="false">
+        </a-video>
+      </a-entity>
+    </a-scene>
+    
+    <div id="title-bar">AR Discount Experience</div>
 
-      scene.addEventListener("arReady", () => {
-        status.innerText = "✅ Point camera at your target";
-      });
+    <div id="loading">📷 Initializing AR camera...</div>
+    <div id="status" style="display: none;">📷 Point your camera at the card</div>
 
-      scene.addEventListener("targetFound", async () => {
-        status.innerText = "🎬 Playing your creation...";
-        plane.setAttribute("visible", true);
-        try {
-          await video.play();
-        } catch {
-          video.muted = true;
-          await video.play();
+    <div id="scratchCardContainer">
+      <div id="scratchCard">
+        <div id="discountText">🎁 You got 25% OFF!</div>         <canvas id="scratchLayer"></canvas>
+      </div>
+    </div>
+
+    <script>
+      // --- Setup ---
+      const video = document.querySelector("#thankYouVideo");
+      const plane = document.querySelector("#videoPlane");
+      const loading = document.getElementById("loading");
+      const status = document.getElementById("status");
+      const scratchCardContainer = document.getElementById("scratchCardContainer");
+      const discountText = document.getElementById("discountText");
+      const scratchLayer = document.getElementById("scratchLayer");
+      const scene = document.querySelector("a-scene");
+      const target = document.querySelector("#target");
+
+      // --- URL Params and State ---
+      const params = new URLSearchParams(window.location.search);
+      const discount = params.get('discount') || "A Reward";
+      const isFirstScan = params.get('isFirst') === 'true'; // Passed from redirect
+      const hasSeenDiscount = localStorage.getItem("arCardScanned") === "true"; // Local state
+
+      // Set the discount text immediately
+      discountText.innerText = `🎁 You got ${discount} OFF!`;
+
+
+      // --- AR Event Handlers ---
+      scene.addEventListener("arReady", () => {
+        loading.style.display = "none";
+        status.style.display = "block";
+        status.innerText = "📷 Point your camera at the card";
+      });
+
+      scene.addEventListener("arError", (e) => {
+        loading.style.display = "flex"; 
+        loading.style.background = "rgba(139, 0, 0, 0.9)";
+        loading.innerHTML = "❌ **Camera Access Failed!** <br><br>Please check browser permissions and refresh the page.";
+        console.error("MindAR Error:", e);
+      });
+
+      target.addEventListener("targetFound", async () => {
+        status.innerText = "🎬 Target found — playing video...";
+        plane.setAttribute("visible", true);
+        try { await video.play(); } catch (e) {}
+
+        // Show scratch card logic only for the first scan
+        if (isFirstScan && !hasSeenDiscount) {
+          setTimeout(() => {
+            // Check if the target is still visible before showing the card
+              if (plane.getAttribute("visible")) {
+                video.pause();
+                plane.setAttribute("visible", false);
+                showScratchCard();
+                localStorage.setItem("arCardScanned", "true");
+              }
+          }, 10000); // Show after 10 seconds of interaction
+        } else if (hasSeenDiscount) {
+          status.innerText = "👀 Already claimed. Video playing...";
         }
-      });
+      });
 
-      scene.addEventListener("targetLost", () => {
-        status.innerText = "📷 Hold steady to keep video visible";
-        video.pause();
-        plane.setAttribute("visible", false);
-      });
-    </script>
-  </body>
+      target.addEventListener("targetLost", () => {
+        video.pause();
+        plane.setAttribute("visible", false);
+        status.innerText = "📷 Keep the card in camera view";
+      });
+
+      // --- Scratch Card Logic ---
+      function showScratchCard() {
+        scratchCardContainer.style.display = "flex";
+        status.style.display = "none"; // Hide status bar
+
+        const ctx = scratchLayer.getContext("2d");
+        scratchLayer.width = scratchLayer.offsetWidth;
+        scratchLayer.height = scratchLayer.offsetHeight;
+
+        const gradient = ctx.createLinearGradient(0, 0, scratchLayer.width, scratchLayer.height);
+        gradient.addColorStop(0, "#555");
+        gradient.addColorStop(1, "#222");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, scratchLayer.width, scratchLayer.height);
+        ctx.globalCompositeOperation = "destination-out";
+
+        let scratching = false;
+        const getPos = e => {
+          const rect = scratchLayer.getBoundingClientRect();
+          const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+          const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+          return { x, y };
+        };
+        const draw = e => {
+          const pos = getPos(e);
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 20, 0, Math.PI * 2);
+          ctx.fill();
+        };
+
+        scratchLayer.addEventListener("mousedown", e => { scratching = true; draw(e); });
+        scratchLayer.addEventListener("mouseup", () => scratching = false);
+        scratchLayer.addEventListener("mousemove", e => scratching && draw(e));
+        scratchLayer.addEventListener("touchstart", e => { scratching = true; draw(e); });
+        scratchLayer.addEventListener("touchend", () => scratching = false);
+        scratchLayer.addEventListener("touchmove", e => scratching && draw(e));
+      }
+    </script>
+  </body>
 </html>
