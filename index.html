@@ -15,7 +15,7 @@
   <style>
     body,html{margin:0;height:100%;background:transparent;font-family:Poppins,Arial}
     #status{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.5);color:#fff;padding:6px 12px;border-radius:8px;z-index:9999}
-    #scratchContainer{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:320px;height:200px;border-radius:16px;display:none;z-index:10000;overflow:hidden;background:linear-gradient(135deg,#ffd54f,#ffb300)}
+    #scratchContainer{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:320px;height:200px;border-radius:16px;display:none;z-index:10000;overflow:hidden;background:linear-gradient(135deg,#ffd54f,#ffca28)}
     #scratchCanvas{width:100%;height:100%}
     #rewardText{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#222}
     #revealMessage{position:fixed;left:50%;top:20%;transform:translateX(-50%);display:none;background:rgba(0,0,0,0.8);color:#fff;padding:16px;border-radius:10px;z-index:10001}
@@ -43,10 +43,10 @@
   </a-scene>
 
 <script>
-  // parse params
   const params = new URLSearchParams(window.location.search);
   const card = params.get('id') || '';
-  const isFirst = (params.get('isFirst') === 'true');
+  const isFirst = params.get('isFirst') === 'true';
+  const discountParam = params.get('discount') || '';
 
   const status = document.getElementById('status');
   const video = document.getElementById('myVideo');
@@ -57,15 +57,12 @@
   const revealMessage = document.getElementById('revealMessage');
   const ctx = scratchCanvas.getContext('2d');
 
-  // Show status messages for debugging
-  document.querySelector('a-scene').addEventListener('arReady', ()=> status.innerText = '✅ Point camera at the target');
-
+  document.querySelector('a-scene').addEventListener('arReady', ()=> status.innerText = '✅ Point camera at your target');
   document.querySelector('a-scene').addEventListener('targetFound', async ()=>{
     status.innerText = '🎬 Target found — playing video';
     plane.setAttribute('visible', true);
     try { await video.play(); } catch(e){}
   });
-
   document.querySelector('a-scene').addEventListener('targetLost', ()=>{
     status.innerText = '📷 Hold steady to keep AR visible';
     video.pause();
@@ -87,49 +84,39 @@
     discountValueEl.innerText = discountText || '--%';
   }
 
-  // scratch handlers
   let scratching=false, revealed=false;
   ['pointerdown','touchstart','mousedown'].forEach(e=> scratchCanvas.addEventListener(e, ()=> scratching=true));
   ['pointerup','touchend','mouseup','mouseleave'].forEach(e=> scratchCanvas.addEventListener(e, ()=> scratching=false));
   scratchCanvas.addEventListener('pointermove', e=>{
     if(!scratching) return;
     const r = scratchCanvas.getBoundingClientRect();
-    const x = (e.clientX||e.touches[0].clientX) - r.left;
-    const y = (e.clientY||e.touches[0].clientY) - r.top;
+    const x = (e.clientX||e.touches && e.touches[0].clientX) - r.left;
+    const y = (e.clientY||e.touches && e.touches[0].clientY) - r.top;
     ctx.globalCompositeOperation = 'destination-out';
     ctx.beginPath(); ctx.arc(x,y,25,0,Math.PI*2); ctx.fill();
   });
 
-  // when video ends, show scratch if allowed
   video.addEventListener('ended', ()=>{
-    // Only show scratch card if backend said first scan
-    if(isFirst){
+    if (isFirst) {
       scratchContainer.style.display = 'block';
-      setupScratch('10%'); // you can instead fetch discount text from backend earlier and include in isFirst flow
+      setupScratch(decodeURIComponent(discountParam) || '10%');
       revealed = false;
     } else {
       revealMessage.style.display = 'block';
       revealMessage.innerHTML = '👋 Welcome back — only AR video is shown.';
-      setTimeout(()=> revealMessage.style.display='none', 2500);
+      setTimeout(()=> revealMessage.style.display='none', 2200);
     }
   });
 
-  // after user finishes scratching (on pointerup) show reward and confetti
   scratchCanvas.addEventListener('pointerup', ()=>{
     if(revealed) return;
     revealed = true;
     scratchContainer.style.display = 'none';
     revealMessage.style.display = 'block';
-    revealMessage.innerHTML = '🎊 You unlocked 10% OFF! Show this at the counter.';
+    revealMessage.innerHTML = `🎊 You unlocked ${decodeURIComponent(discountParam) || '10%'} OFF! Show this at counter.`;
     confetti({particleCount:80, spread:60, origin:{y:0.6}});
   });
 
-  // show discount immediately when page loaded if URL carries discountAssigned param (optional)
-  const discountAssigned = params.get('discount') || null;
-  if(discountAssigned) discountValueEl.innerText = discountAssigned;
-
-  // For debugging: display card id
-  console.log('card id', card, 'isFirst', isFirst);
 </script>
 </body>
 </html>
