@@ -134,16 +134,43 @@
   <div id="toast"></div>
 
   <!-- AR Scene -->
-  <a-scene mindar-image="imageTargetSrc: targets (1).mind; autoStart:true" embedded vr-mode-ui="enabled:false">
-    <a-assets>
-      <video id="myVideo" src="thank_you.mp4" playsinline preload="auto" crossorigin="anonymous"></video>
-    </a-assets>
-    <a-camera look-controls="enabled:false"></a-camera>
-    <a-entity mindar-image-target="targetIndex:0">
-      <a-video id="videoPlane" src="#myVideo" width="1" height="0.56" visible="false" material="shader:flat; opacity:0;"></a-video>
-    </a-entity>
-  </a-scene>
+  <a-scene
+  mindar-image="imageTargetSrc: targets.mind; autoStart: true;"
+  embedded
+  color-space="sRGB"
+  renderer="colorManagement: true, physicallyCorrectLights"
+  vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: false"
+>
+  <a-assets>
+    <!-- autoplay muted ensures smooth auto playback -->
+    <video
+      id="myVideo"
+      src="thank_you.mp4"
+      playsinline
+      preload="auto"
+      crossorigin="anonymous"
+      loop="false"
+      muted="true"
+    ></video>
+  </a-assets>
 
+  <a-camera look-controls="enabled: false"></a-camera>
+
+  <a-entity mindar-image-target="targetIndex: 0">
+    <a-video
+      id="videoPlane"
+      src="#myVideo"
+      width="1"
+      height="0.56"
+      position="0 0 0"
+      rotation="0 0 0"
+      material="shader: flat; transparent: true; opacity: 0"
+      visible="false"
+    ></a-video>
+  </a-entity>
+</a-scene>
+  
 <script>
 const params = new URLSearchParams(window.location.search);
 const discount = decodeURIComponent(params.get('discount') || '');
@@ -244,3 +271,4 @@ function showToast(msg) {
 </script>
 </body>
 </html>
+
