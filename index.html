@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>AR Discount Card</title>
+    <title>AR Discount Card — Luxury Edition</title>
 
     <!-- A-Frame + MindAR -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.3/dist/mindar-image-aframe.prod.js"></script>
 
     <style>
-      body, html {
+      html, body {
         margin: 0;
         padding: 0;
         overflow: hidden;
@@ -18,6 +18,7 @@
         background: #000;
       }
 
+      /* Luxury overlay */
       #overlay {
         position: fixed;
         top: 0;
@@ -28,33 +29,43 @@
         align-items: center;
         justify-content: center;
         flex-direction: column;
-        background: radial-gradient(circle at center, #111 30%, #000 100%);
+        background: radial-gradient(circle at center, #0a0a0a 40%, #000 100%);
         color: #d4af37;
         text-align: center;
         z-index: 10;
       }
 
       .glow {
-        font-size: 1.5em;
-        text-shadow: 0 0 10px #d4af37, 0 0 20px #d4af37, 0 0 30px #b8860b;
+        font-size: 2em;
+        text-shadow: 0 0 15px #d4af37, 0 0 25px #b8860b, 0 0 40px #d4af37;
+        margin-bottom: 15px;
       }
 
       .scratch-card {
-        margin-top: 15px;
-        font-size: 2em;
+        margin-top: 10px;
+        font-size: 2.2em;
         color: #fff;
         border: 2px solid #d4af37;
-        padding: 15px 30px;
-        border-radius: 12px;
-        background: rgba(0,0,0,0.8);
-        box-shadow: 0 0 20px #d4af37;
+        padding: 20px 35px;
+        border-radius: 16px;
+        background: rgba(0, 0, 0, 0.85);
+        box-shadow: 0 0 25px #d4af37, inset 0 0 15px #b8860b;
+      }
+
+      /* Subtle shimmer animation */
+      @keyframes shimmer {
+        0% { text-shadow: 0 0 10px #d4af37, 0 0 20px #b8860b; }
+        100% { text-shadow: 0 0 25px #b8860b, 0 0 45px #d4af37; }
+      }
+      .glow {
+        animation: shimmer 2s ease-in-out infinite alternate;
       }
     </style>
   </head>
 
   <body>
     <div id="overlay">
-      <div class="glow" id="rewardText">Checking reward...</div>
+      <div class="glow" id="rewardText">Checking your reward...</div>
       <div id="discountBox" class="scratch-card"></div>
     </div>
 
@@ -63,25 +74,33 @@
       color-space="sRGB"
       renderer="colorManagement: true, physicallyCorrectLights"
       vr-mode-ui="enabled: false"
-      device-orientation-permission-ui="enabled: false">
-
+      device-orientation-permission-ui="enabled: false"
+      embedded
+    >
       <a-assets>
         <video id="thankyou" src="thank_you.mp4" loop muted playsinline crossorigin="anonymous"></video>
       </a-assets>
 
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <a-entity mindar-image-target="targetIndex: 0">
-        <a-video id="videoScreen" src="#thankyou" width="1" height="0.56" position="0 0 0" rotation="0 0 0"></a-video>
+      <a-entity mindar-image-target="targetIndex: 0" id="target">
+        <a-video
+          id="videoScreen"
+          src="#thankyou"
+          width="1"
+          height="0.56"
+          position="0 0 0"
+        ></a-video>
       </a-entity>
     </a-scene>
 
     <script>
       const BACKEND = "https://script.google.com/macros/s/AKfycbyyJy9G9LOa2bcuKMq8fyLd_167Tu-kDYgpGbyIwjsPBoevjNKTBZUBG2DvPtNP8r4F/exec";
-      const video = document.getElementById("thankyou");
       const overlay = document.getElementById("overlay");
       const rewardText = document.getElementById("rewardText");
       const discountBox = document.getElementById("discountBox");
+      const video = document.getElementById("thankyou");
+      const scene = document.querySelector("a-scene");
 
       async function fetchDiscount() {
         const params = new URLSearchParams(window.location.search);
@@ -100,28 +119,29 @@
 
       document.addEventListener("DOMContentLoaded", async () => {
         const result = await fetchDiscount();
-        const scene = document.querySelector("a-scene");
-        const target = scene.components["mindar-image"].mindar.controller.imageTargetEntities[0];
 
-        target.addEventListener("targetFound", () => {
-          console.log("Target Found!");
+        const target = document.querySelector("#target");
+
+        target.addEventListener("targetFound", async () => {
+          console.log("🎯 Target Found!");
           video.play();
 
+          // Show discount screen only on FIRST scan
           if (result.isFirstScan) {
-            // show discount only first time
             setTimeout(() => {
-              document.querySelector("a-scene").style.display = "none"; // hide background
-              overlay.style.display = "flex";
+              scene.style.display = "none"; // hide camera background
+              overlay.style.display = "flex"; // show black luxury discount
               rewardText.textContent = "🎉 Congratulations!";
               discountBox.textContent = `${result.discount_assigned || "5%"} OFF`;
-            }, 10000); // show reward after 10 sec of AR
+            }, 5000); // delay before showing reward
           } else {
-            overlay.style.display = "none"; // no reward
-            document.querySelector("a-scene").style.display = "block";
+            overlay.style.display = "none";
+            scene.style.display = "block";
           }
         });
 
         target.addEventListener("targetLost", () => {
+          console.log("📷 Target Lost!");
           video.pause();
         });
       });
