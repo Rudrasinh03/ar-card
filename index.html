@@ -13,9 +13,22 @@
     html,body{margin:0;height:100%;overflow:hidden;background:transparent}
     #status{
       position:fixed;bottom:12px;left:50%;transform:translateX(-50%);
-      color:white;font-family:sans-serif;
-      background:rgba(0,0,0,0.55);padding:6px 12px;border-radius:10px;
-      font-size:14px;text-align:center
+      color:white;font-family:sans-serif;background:rgba(0,0,0,0.55);
+      padding:6px 12px;border-radius:10px;font-size:14px;text-align:center
+    }
+    /* Scratch card overlay */
+    #scratchOverlay{
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      display:none;align-items:center;justify-content:center;
+      background:rgba(0,0,0,0.9);flex-direction:column;z-index:9999
+    }
+    #scratchCanvas{
+      border-radius:20px;
+      box-shadow:0 0 15px rgba(255,255,255,0.3);
+    }
+    #discountText{
+      position:absolute;color:#0b8d6d;font-size:2rem;
+      font-weight:bold;pointer-events:none;
     }
   </style>
 </head>
@@ -23,8 +36,14 @@
 <body>
   <div id="status">📷 Initializing camera...</div>
 
+  <!-- Scratch Card Overlay -->
+  <div id="scratchOverlay">
+    <canvas id="scratchCanvas" width="300" height="200"></canvas>
+    <div id="discountText"></div>
+  </div>
+
   <a-scene
-    mindar-image="imageTargetSrc: targets (1).mind; autoStart: true;"
+    mindar-image="imageTargetSrc: targets.mind; autoStart: true;"
     color-space="sRGB"
     renderer="colorManagement:true,physicallyCorrectLights:false,alpha:true"
     vr-mode-ui="enabled:false"
@@ -53,6 +72,7 @@
     const discount = params.get('discount') || "";
     const isFirst = params.get('isFirst') === "true";
 
+    // === AR VIDEO LOGIC ===
     video.addEventListener("loadedmetadata", () => {
       const aspect = video.videoWidth / video.videoHeight;
       plane.setAttribute("width", 1);
@@ -68,11 +88,12 @@
     scene.addEventListener("targetFound", async () => {
       status.innerText = "🎬 Playing your experience...";
       plane.setAttribute("visible", true);
-      try {
-        await video.play();
-      } catch {
-        video.muted = true;
-        await video.play();
+      try { await video.play(); } 
+      catch { video.muted = true; await video.play(); }
+
+      // 🕒 Show scratch card after 10s only for first scan
+      if (isFirst) {
+        setTimeout(showScratchCard, 10000);
       }
     });
 
@@ -81,6 +102,44 @@
       video.pause();
       plane.setAttribute("visible", false);
     });
+
+    // === SCRATCH CARD LOGIC ===
+    const overlay = document.getElementById("scratchOverlay");
+    const canvas = document.getElementById("scratchCanvas");
+    const ctx = canvas.getContext("2d");
+    const discountText = document.getElementById("discountText");
+
+    function showScratchCard() {
+      overlay.style.display = "flex";
+      status.style.display = "none";
+
+      // Hide AR background by setting alpha to 0
+      document.querySelector("a-scene").style.opacity = "0";
+
+      discountText.innerText = discount || "🎁 Reward";
+
+      // Gray top layer
+      ctx.fillStyle = "#bbb";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = "destination-out";
+
+      let scratching = false;
+      const scratch = (e) => {
+        if (!scratching) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+        ctx.beginPath();
+        ctx.arc(x, y, 20, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      canvas.addEventListener("mousedown", () => (scratching = true));
+      canvas.addEventListener("mouseup", () => (scratching = false));
+      canvas.addEventListener("mousemove", scratch);
+      canvas.addEventListener("touchstart", () => (scratching = true));
+      canvas.addEventListener("touchend", () => (scratching = false));
+      canvas.addEventListener("touchmove", scratch);
+    }
   </script>
 </body>
 </html>
