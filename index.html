@@ -1,123 +1,135 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AR Thank You Card + Discount (Per QR Fixed)</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>AR Card</title>
 
   <!-- A-Frame + MindAR -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
+  <!-- confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
   <style>
-    body, html { margin:0; height:100%; overflow:hidden; font-family: Poppins, sans-serif; }
-
-    #status {
-      position: fixed;
-      bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: white;
-      background: rgba(0,0,0,0.6);
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 14px;
-      z-index: 10;
-    }
-
-    #overlay {
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      display: none;
-      align-items: center; justify-content: center; flex-direction: column;
-      background: rgba(0,0,0,0.85);
-      z-index: 999;
-      text-align: center;
-    }
-
-    #scratch-card {
-      width: 250px; height: 150px;
-      background: gold;
-      border-radius: 15px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 24px; color: black; font-weight: bold;
-    }
-
-    #no-discount {
-      font-size: 22px;
-      color: #ff4444;
-      display: none;
-    }
+    body,html{margin:0;height:100%;background:transparent;font-family:Poppins,Arial}
+    #status{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.5);color:#fff;padding:6px 12px;border-radius:8px;z-index:9999}
+    #scratchContainer{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:320px;height:200px;border-radius:16px;display:none;z-index:10000;overflow:hidden;background:linear-gradient(135deg,#ffd54f,#ffb300)}
+    #scratchCanvas{width:100%;height:100%}
+    #rewardText{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#222}
+    #revealMessage{position:fixed;left:50%;top:20%;transform:translateX(-50%);display:none;background:rgba(0,0,0,0.8);color:#fff;padding:16px;border-radius:10px;z-index:10001}
   </style>
 </head>
-
 <body>
   <div id="status">📷 Initializing camera...</div>
 
-  <a-scene mindar-image="imageTargetSrc: targets (1).mind; autoStart: true;"
-           color-space="sRGB"
-           renderer="colorManagement:true;alpha:true;"
-           vr-mode-ui="enabled:false" embedded>
+  <div id="scratchContainer">
+    <canvas id="scratchCanvas"></canvas>
+    <div id="rewardText">🎉 <span id="discountValue">--%</span> OFF</div>
+  </div>
+
+  <div id="revealMessage"></div>
+
+  <a-scene mindar-image="imageTargetSrc: targets (1).mind; autoStart:true" embedded vr-mode-ui="enabled:false">
     <a-assets>
-      <video id="thankyou" src="thank_you.mp4" autoplay loop="false" preload="auto" playsinline></video>
+      <video id="myVideo" src="thank_you.mp4" playsinline preload="auto" crossorigin="anonymous"></video>
     </a-assets>
 
     <a-camera look-controls="enabled:false"></a-camera>
-    <a-entity mindar-image-target="targetIndex: 0">
-      <a-video src="#thankyou" width="1" height="0.56" position="0 0 0" visible="false"></a-video>
+    <a-entity mindar-image-target="targetIndex:0">
+      <a-video id="videoPlane" src="#myVideo" width="1" height="0.56" position="0 0 0.01" visible="false" material="shader:flat"></a-video>
     </a-entity>
   </a-scene>
 
-  <div id="overlay">
-    <div id="scratch-card">🎁 You won 20% OFF!</div>
-    <div id="no-discount">😔 Sorry, no discount this time</div>
-  </div>
+<script>
+  // parse params
+  const params = new URLSearchParams(window.location.search);
+  const card = params.get('id') || '';
+  const isFirst = (params.get('isFirst') === 'true');
 
-  <script>
-    const status = document.querySelector("#status");
-    const video = document.querySelector("#thankyou");
-    const videoPlane = document.querySelector("a-video");
-    const overlay = document.querySelector("#overlay");
-    const scratchCard = document.querySelector("#scratch-card");
-    const noDiscount = document.querySelector("#no-discount");
+  const status = document.getElementById('status');
+  const video = document.getElementById('myVideo');
+  const plane = document.getElementById('videoPlane');
+  const scratchContainer = document.getElementById('scratchContainer');
+  const scratchCanvas = document.getElementById('scratchCanvas');
+  const discountValueEl = document.getElementById('discountValue');
+  const revealMessage = document.getElementById('revealMessage');
+  const ctx = scratchCanvas.getContext('2d');
 
-    // Extract card ID from URL (?id=QR001)
-    const urlParams = new URLSearchParams(window.location.search);
-    const cardId = urlParams.get("id") || "default";
+  // Show status messages for debugging
+  document.querySelector('a-scene').addEventListener('arReady', ()=> status.innerText = '✅ Point camera at the target');
 
-    // Use card-specific key
-    const scanKey = `scan_count_${cardId}`;
-    let scanCount = parseInt(localStorage.getItem(scanKey)) || 0;
+  document.querySelector('a-scene').addEventListener('targetFound', async ()=>{
+    status.innerText = '🎬 Target found — playing video';
+    plane.setAttribute('visible', true);
+    try { await video.play(); } catch(e){}
+  });
 
-    document.querySelector("a-scene").addEventListener("targetFound", () => {
-      videoPlane.setAttribute("visible", true);
-      video.play();
-      status.textContent = "🎬 Target found! Playing video...";
+  document.querySelector('a-scene').addEventListener('targetLost', ()=>{
+    status.innerText = '📷 Hold steady to keep AR visible';
+    video.pause();
+    plane.setAttribute('visible', false);
+  });
 
-      setTimeout(() => {
-        video.pause();
-        videoPlane.setAttribute("visible", false);
-        overlay.style.display = "flex";
+  // scratch setup
+  function setupScratch(discountText) {
+    const rect = scratchContainer.getBoundingClientRect();
+    scratchCanvas.width = rect.width;
+    scratchCanvas.height = rect.height;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#aaa';
+    ctx.fillRect(0,0,rect.width,rect.height);
+    ctx.font = "bold 18px Poppins";
+    ctx.fillStyle = "#222";
+    ctx.textAlign = 'center';
+    ctx.fillText('Scratch to reveal', rect.width/2, rect.height/2);
+    discountValueEl.innerText = discountText || '--%';
+  }
 
-        if (scanCount === 0) {
-          scratchCard.style.display = "flex";
-          noDiscount.style.display = "none";
-        } else {
-          scratchCard.style.display = "none";
-          noDiscount.style.display = "block";
-        }
+  // scratch handlers
+  let scratching=false, revealed=false;
+  ['pointerdown','touchstart','mousedown'].forEach(e=> scratchCanvas.addEventListener(e, ()=> scratching=true));
+  ['pointerup','touchend','mouseup','mouseleave'].forEach(e=> scratchCanvas.addEventListener(e, ()=> scratching=false));
+  scratchCanvas.addEventListener('pointermove', e=>{
+    if(!scratching) return;
+    const r = scratchCanvas.getBoundingClientRect();
+    const x = (e.clientX||e.touches[0].clientX) - r.left;
+    const y = (e.clientY||e.touches[0].clientY) - r.top;
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath(); ctx.arc(x,y,25,0,Math.PI*2); ctx.fill();
+  });
 
-        // Save scan record
-        scanCount++;
-        localStorage.setItem(scanKey, scanCount);
-      }, 10000);
-    });
+  // when video ends, show scratch if allowed
+  video.addEventListener('ended', ()=>{
+    // Only show scratch card if backend said first scan
+    if(isFirst){
+      scratchContainer.style.display = 'block';
+      setupScratch('10%'); // you can instead fetch discount text from backend earlier and include in isFirst flow
+      revealed = false;
+    } else {
+      revealMessage.style.display = 'block';
+      revealMessage.innerHTML = '👋 Welcome back — only AR video is shown.';
+      setTimeout(()=> revealMessage.style.display='none', 2500);
+    }
+  });
 
-    document.querySelector("a-scene").addEventListener("targetLost", () => {
-      video.pause();
-      videoPlane.setAttribute("visible", false);
-      status.textContent = "📷 Show the target image to play again.";
-    });
-  </script>
+  // after user finishes scratching (on pointerup) show reward and confetti
+  scratchCanvas.addEventListener('pointerup', ()=>{
+    if(revealed) return;
+    revealed = true;
+    scratchContainer.style.display = 'none';
+    revealMessage.style.display = 'block';
+    revealMessage.innerHTML = '🎊 You unlocked 10% OFF! Show this at the counter.';
+    confetti({particleCount:80, spread:60, origin:{y:0.6}});
+  });
+
+  // show discount immediately when page loaded if URL carries discountAssigned param (optional)
+  const discountAssigned = params.get('discount') || null;
+  if(discountAssigned) discountValueEl.innerText = discountAssigned;
+
+  // For debugging: display card id
+  console.log('card id', card, 'isFirst', isFirst);
+</script>
 </body>
 </html>
