@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AR Discount Experience</title>
+
+    <!-- A-Frame + MindAR -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        font-family: "Poppins", sans-serif;
+      }
+
+      #status {
+        position: fixed;
+        bottom: 15px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #ffd700;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 8px 18px;
+        border-radius: 10px;
+        font-size: 14px;
+        backdrop-filter: blur(6px);
+        z-index: 9999;
+        text-shadow: 0 0 8px #ffd700;
+      }
+
+      /* Scratch Card Overlay */
+      #scratchCardContainer {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        background: radial-gradient(circle at center, #0a0a0a 60%, #000 100%);
+        z-index: 10000;
+        animation: fadeIn 0.6s ease-in-out forwards;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      #scratchCard {
+        width: 320px;
+        height: 190px;
+        background: linear-gradient(145deg, #000, #111);
+        border: 1px solid rgba(255, 215, 0, 0.6);
+        border-radius: 18px;
+        position: relative;
+        box-shadow: 0 0 40px rgba(255, 215, 0, 0.3);
+        overflow: hidden;
+      }
+
+      #discountText {
+        color: #ffd700;
+        font-size: 26px;
+        text-align: center;
+        font-weight: 600;
+        text-shadow: 0 0 12px #ffd700;
+        padding-top: 70px;
+      }
+
+      canvas#scratchLayer {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 18px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="status">📷 Initializing AR camera...</div>
+
+    <!-- AR Scene with camera feed -->
+    <a-scene
+      mindar-image="imageTargetSrc: targets.mind; autoStart: true;"
+      color-space="sRGB"
+      renderer="colorManagement: true; alpha: true;"
+      vr-mode-ui="enabled: false"
+      embedded
+    >
+      <a-assets>
+        <video id="thankYouVideo" src="thank_you.mp4" loop muted playsinline crossorigin="anonymous"></video>
+      </a-assets>
+
+      <a-camera look-controls="enabled: false"></a-camera>
+
+      <a-entity mindar-image-target="targetIndex: 0" id="target">
+        <a-video id="videoPlane" src="#thankYouVideo" width="1" height="0.56" position="0 0 0.01" visible="false"></a-video>
+      </a-entity>
+    </a-scene>
+
+    <!-- Scratch Card Overlay -->
+    <div id="scratchCardContainer">
+      <div id="scratchCard">
+        <div id="discountText">🎁 You got 25% OFF!</div>
+        <canvas id="scratchLayer"></canvas>
+      </div>
+    </div>
+
+    <script>
+      const video = document.querySelector("#thankYouVideo");
+      const plane = document.querySelector("#videoPlane");
+      const status = document.getElementById("status");
+      const scratchCardContainer = document.getElementById("scratchCardContainer");
+      const scratchLayer = document.getElementById("scratchLayer");
+      let targetVisible = false;
+
+      // Track if already scanned before
+      const isScanned = localStorage.getItem("arCardScanned") === "true";
+
+      // Adjust video aspect ratio
+      video.addEventListener("loadedmetadata", () => {
+        const aspect = video.videoWidth / video.videoHeight;
+        plane.setAttribute("width", 1);
+        plane.setAttribute("height", 1 / aspect);
+      });
+
+      // When AR is ready
+      document.querySelector("a-scene").addEventListener("arReady", () => {
+        status.innerText = "✅ Point your camera at the card";
+      });
+
+      // When target found
+      document.querySelector("#target").addEventListener("targetFound", async () => {
+        targetVisible = true;
+        status.innerText = "🎬 Target found — playing video...";
+        plane.setAttribute("visible", true);
+        try { await video.play(); } catch (e) {}
+
+        // First time only: show scratch card after 10s
+        if (!isScanned) {
+          setTimeout(() => {
+            if (targetVisible) {
+              video.pause();
+              plane.setAttribute("visible", false);
+              showScratchCard();
+              localStorage.setItem("arCardScanned", "true");
+            }
+          }, 10000);
+        }
+      });
+
+      // When target lost
+      document.querySelector("#target").addEventListener("targetLost", () => {
+        targetVisible = false;
+        video.pause();
+        plane.setAttribute("visible", false);
+        status.innerText = "📷 Keep card in camera view";
+      });
+
+      // Scratch logic
+      function showScratchCard() {
+        scratchCardContainer.style.display = "flex";
+        const ctx = scratchLayer.getContext("2d");
+        scratchLayer.width = scratchLayer.offsetWidth;
+        scratchLayer.height = scratchLayer.offsetHeight;
+
+        // Add metallic effect
+        const gradient = ctx.createLinearGradient(0, 0, scratchLayer.width, scratchLayer.height);
+        gradient.addColorStop(0, "#555");
+        gradient.addColorStop(1, "#222");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, scratchLayer.width, scratchLayer.height);
+        ctx.globalCompositeOperation = "destination-out";
+
+        let scratching = false;
+
+        const start = e => { scratching = true; draw(e); };
+        const end = () => { scratching = false; };
+        const move = e => { if (scratching) draw(e); };
+
+        const getPos = e => {
+          const rect = scratchLayer.getBoundingClientRect();
+          const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+          const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+          return { x, y };
+        };
+
+        const draw = e => {
+          const pos = getPos(e);
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 20, 0, Math.PI * 2);
+          ctx.fill();
+        };
+
+        scratchLayer.addEventListener("mousedown", start);
+        scratchLayer.addEventListener("mouseup", end);
+        scratchLayer.addEventListener("mousemove", move);
+        scratchLayer.addEventListener("touchstart", start);
+        scratchLayer.addEventListener("touchend", end);
+        scratchLayer.addEventListener("touchmove", move);
+      }
+    </script>
+  </body>
+</html>
