@@ -8,115 +8,155 @@
   <!-- A-Frame + MindAR -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-
-  <!-- confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <style>
-    body,html{margin:0;height:100%;background:transparent;font-family:Poppins,Arial}
-    #status{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.5);color:#fff;padding:6px 12px;border-radius:8px;z-index:9999}
-    #scratchContainer{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:320px;height:200px;border-radius:16px;display:none;z-index:10000;overflow:hidden;background:linear-gradient(135deg,#ffd54f,#ffca28)}
-    #scratchCanvas{width:100%;height:100%}
-    #rewardText{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#222}
-    #revealMessage{position:fixed;left:50%;top:20%;transform:translateX(-50%);display:none;background:rgba(0,0,0,0.8);color:#fff;padding:16px;border-radius:10px;z-index:10001}
+    body,html{margin:0;height:100%;font-family:Poppins,Arial;background:transparent}
+    #status{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;padding:8px 12px;border-radius:10px;z-index:9999}
+    /* Reveal overlay */
+    #overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:10000}
+    #card{width:360px;max-width:92%;background:linear-gradient(135deg,#fff7e6,#fff1cc);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,0.45);padding:22px;text-align:center;position:relative}
+    #card h2{margin:0 0 8px;color:#222;font-size:22px}
+    #card p.sub{margin:0 0 12px;color:#444}
+    #scratchCanvas{width:100%;height:140px;border-radius:12px;background:#c7b37a;display:block;cursor:crosshair}
+    #revealText{margin-top:14px;font-weight:700;color:#2b2b2b;font-size:20px}
+    #closeBtn{position:absolute;top:10px;right:10px;background:transparent;border:none;font-size:18px;cursor:pointer}
+    #toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.75);color:#fff;padding:10px 14px;border-radius:10px;display:none;z-index:10001}
   </style>
 </head>
 <body>
   <div id="status">📷 Initializing camera...</div>
-
-  <div id="scratchContainer">
-    <canvas id="scratchCanvas"></canvas>
-    <div id="rewardText">🎉 <span id="discountValue">--%</span> OFF</div>
+  <div id="overlay" aria-hidden="true">
+    <div id="card">
+      <button id="closeBtn" title="Close">✕</button>
+      <h2>🎉 You unlocked a reward!</h2>
+      <p class="sub">Scratch the silver area to reveal your offer</p>
+      <canvas id="scratchCanvas"></canvas>
+      <div id="revealText"></div>
+    </div>
   </div>
-
-  <div id="revealMessage"></div>
+  <div id="toast"></div>
 
   <a-scene mindar-image="imageTargetSrc: targets (1).mind; autoStart:true" embedded vr-mode-ui="enabled:false">
     <a-assets>
       <video id="myVideo" src="thank_you.mp4" playsinline preload="auto" crossorigin="anonymous"></video>
     </a-assets>
-
     <a-camera look-controls="enabled:false"></a-camera>
     <a-entity mindar-image-target="targetIndex:0">
-      <a-video id="videoPlane" src="#myVideo" width="1" height="0.56" position="0 0 0.01" visible="false" material="shader:flat"></a-video>
+      <a-video id="videoPlane" src="#myVideo" width="1" height="0.56" visible="false" material="shader:flat"></a-video>
     </a-entity>
   </a-scene>
 
 <script>
+  // read params
   const params = new URLSearchParams(window.location.search);
   const card = params.get('id') || '';
   const isFirst = params.get('isFirst') === 'true';
-  const discountParam = params.get('discount') || '';
+  const discount = decodeURIComponent(params.get('discount') || '');
 
   const status = document.getElementById('status');
   const video = document.getElementById('myVideo');
   const plane = document.getElementById('videoPlane');
-  const scratchContainer = document.getElementById('scratchContainer');
-  const scratchCanvas = document.getElementById('scratchCanvas');
-  const discountValueEl = document.getElementById('discountValue');
-  const revealMessage = document.getElementById('revealMessage');
-  const ctx = scratchCanvas.getContext('2d');
 
-  document.querySelector('a-scene').addEventListener('arReady', ()=> status.innerText = '✅ Point camera at your target');
+  const overlay = document.getElementById('overlay');
+  const scratchCanvas = document.getElementById('scratchCanvas');
+  const revealText = document.getElementById('revealText');
+  const closeBtn = document.getElementById('closeBtn');
+  const toast = document.getElementById('toast');
+
+  // AR events
+  document.querySelector('a-scene').addEventListener('arReady', ()=> status.innerText='✅ Point camera at target');
   document.querySelector('a-scene').addEventListener('targetFound', async ()=>{
-    status.innerText = '🎬 Target found — playing video';
+    status.innerText='🎬 Target found — playing video';
     plane.setAttribute('visible', true);
-    try { await video.play(); } catch(e){}
+    try{ await video.play(); }catch(e){}
   });
   document.querySelector('a-scene').addEventListener('targetLost', ()=>{
-    status.innerText = '📷 Hold steady to keep AR visible';
+    status.innerText='📷 Hold steady to keep AR visible';
     video.pause();
     plane.setAttribute('visible', false);
   });
 
-  // scratch setup
-  function setupScratch(discountText) {
-    const rect = scratchContainer.getBoundingClientRect();
-    scratchCanvas.width = rect.width;
-    scratchCanvas.height = rect.height;
+  // scratch setup helpers
+  let ctx, scratching=false, revealed=false;
+  function initScratch(){
+    const rect = scratchCanvas.getBoundingClientRect();
+    scratchCanvas.width = Math.max(300, rect.width*devicePixelRatio);
+    scratchCanvas.height = Math.max(140, rect.height*devicePixelRatio);
+    // scale canvas visually
+    scratchCanvas.style.width = '100%';
+    scratchCanvas.style.height = '140px';
+    ctx = scratchCanvas.getContext('2d');
+    // draw metallic overlay
     ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = '#aaa';
-    ctx.fillRect(0,0,rect.width,rect.height);
-    ctx.font = "bold 18px Poppins";
-    ctx.fillStyle = "#222";
-    ctx.textAlign = 'center';
-    ctx.fillText('Scratch to reveal', rect.width/2, rect.height/2);
-    discountValueEl.innerText = discountText || '--%';
+    const grad = ctx.createLinearGradient(0,0,scratchCanvas.width,scratchCanvas.height);
+    grad.addColorStop(0,'#bdbdbd'); grad.addColorStop(0.5,'#e6e6e6'); grad.addColorStop(1,'#b0a090');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,scratchCanvas.width,scratchCanvas.height);
+    ctx.fillStyle = "rgba(0,0,0,0.85)";
+    ctx.font = `${Math.floor(24*devicePixelRatio)}px Poppins`;
+    ctx.textAlign = "center";
+    ctx.fillText("Scratch to reveal", scratchCanvas.width/2, scratchCanvas.height/2 + 8*devicePixelRatio);
   }
 
-  let scratching=false, revealed=false;
-  ['pointerdown','touchstart','mousedown'].forEach(e=> scratchCanvas.addEventListener(e, ()=> scratching=true));
-  ['pointerup','touchend','mouseup','mouseleave'].forEach(e=> scratchCanvas.addEventListener(e, ()=> scratching=false));
-  scratchCanvas.addEventListener('pointermove', e=>{
-    if(!scratching) return;
-    const r = scratchCanvas.getBoundingClientRect();
-    const x = (e.clientX||e.touches && e.touches[0].clientX) - r.left;
-    const y = (e.clientY||e.touches && e.touches[0].clientY) - r.top;
+  function scratchAt(x,y){
+    if(!ctx) return;
     ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath(); ctx.arc(x,y,25,0,Math.PI*2); ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x*devicePixelRatio, y*devicePixelRatio, 28*devicePixelRatio, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  ['pointerdown','touchstart','mousedown'].forEach(ev => {
+    scratchCanvas.addEventListener(ev, ()=> scratching=true);
+  });
+  ['pointerup','touchend','mouseup','mouseleave'].forEach(ev => {
+    scratchCanvas.addEventListener(ev, ()=> scratching=false);
+  });
+  scratchCanvas.addEventListener('pointermove', function(e){
+    if(!scratching) return;
+    const rect = scratchCanvas.getBoundingClientRect();
+    const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+    const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+    scratchAt(x,y);
   });
 
+  scratchCanvas.addEventListener('pointerup', function(){
+    if(revealed) return;
+    revealed = true;
+    // reveal text and confetti
+    overlay.style.display = 'none';
+    revealMessageAndConfetti();
+  });
+
+  closeBtn.addEventListener('click', ()=> overlay.style.display='none');
+
+  function revealMessageAndConfetti(){
+    const text = discount ? `🎊 You unlocked ${discount} OFF!` : '🎊 You unlocked a reward!';
+    toast.innerText = text;
+    toast.style.display = 'block';
+    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }});
+    setTimeout(()=> toast.style.display='none', 5000);
+  }
+
+  // When video ends: show scratch only if first scan; else small toast
   video.addEventListener('ended', ()=>{
-    if (isFirst) {
-      scratchContainer.style.display = 'block';
-      setupScratch(decodeURIComponent(discountParam) || '10%');
-      revealed = false;
+    if(isFirst){
+      // show overlay and init scratch
+      overlay.style.display = 'flex';
+      // small delay to ensure canvas has layout
+      setTimeout(()=> initScratch(), 120);
+      // overlay aria visible
     } else {
-      revealMessage.style.display = 'block';
-      revealMessage.innerHTML = '👋 Welcome back — only AR video is shown.';
-      setTimeout(()=> revealMessage.style.display='none', 2200);
+      // small toast
+      toast.innerText = "👋 Welcome back — only AR video is shown.";
+      toast.style.display = 'block';
+      setTimeout(()=> toast.style.display='none', 2200);
     }
   });
 
-  scratchCanvas.addEventListener('pointerup', ()=>{
-    if(revealed) return;
-    revealed = true;
-    scratchContainer.style.display = 'none';
-    revealMessage.style.display = 'block';
-    revealMessage.innerHTML = `🎊 You unlocked ${decodeURIComponent(discountParam) || '10%'} OFF! Show this at counter.`;
-    confetti({particleCount:80, spread:60, origin:{y:0.6}});
-  });
-
+  // If users land here and want to debug: log params
+  console.log({card,isFirst,discount});
 </script>
 </body>
 </html>
