@@ -147,6 +147,7 @@
 <script>
 const params = new URLSearchParams(window.location.search);
 const discount = decodeURIComponent(params.get('discount') || '');
+const isFirst = params.get('isFirst') === 'true';
 
 const status = document.getElementById('status');
 const video = document.getElementById('myVideo');
@@ -157,78 +158,88 @@ const closeBtn = document.getElementById('closeBtn');
 const toast = document.getElementById('toast');
 const revealedDiscount = document.getElementById('revealedDiscount');
 
-document.querySelector('a-scene').addEventListener('arReady', ()=> {
-  status.innerText='✅ Ready — point camera at your card';
+// ----------- AR Handling -----------
+document.querySelector('a-scene').addEventListener('arReady', () => {
+  status.innerText = '✅ Ready — point camera at your card';
 });
-document.querySelector('a-scene').addEventListener('targetFound', async ()=>{
-  status.innerText='🎬 Target found — video playing';
+document.querySelector('a-scene').addEventListener('targetFound', async () => {
+  status.innerText = '🎬 Target found — video playing';
   plane.setAttribute('visible', true);
-  plane.setAttribute('material','shader:flat; opacity:1;');
-  try{ await video.play(); }catch(e){}
+  plane.setAttribute('material', 'shader:flat; opacity:1;');
+  try { await video.play(); } catch(e) {}
 });
-document.querySelector('a-scene').addEventListener('targetLost', ()=>{
-  status.innerText='📷 Hold steady to keep AR visible';
+document.querySelector('a-scene').addEventListener('targetLost', () => {
+  status.innerText = '📷 Hold steady to keep AR visible';
   video.pause();
-  plane.setAttribute('material','shader:flat; opacity:0;');
+  plane.setAttribute('material', 'shader:flat; opacity:0;');
   plane.setAttribute('visible', false);
 });
 
-let ctx, scratching=false;
-function initScratch(){
+// ----------- Scratch System -----------
+let ctx, scratching = false;
+
+function initScratch() {
   const rect = scratchCanvas.getBoundingClientRect();
   scratchCanvas.width = rect.width * devicePixelRatio;
   scratchCanvas.height = 150 * devicePixelRatio;
   ctx = scratchCanvas.getContext('2d');
 
-  const grad = ctx.createLinearGradient(0,0,scratchCanvas.width,scratchCanvas.height);
-  grad.addColorStop(0,'#b0b0b0');
-  grad.addColorStop(0.5,'#dcdcdc');
-  grad.addColorStop(1,'#a0a0a0');
+  // Metallic gradient look
+  const grad = ctx.createLinearGradient(0, 0, scratchCanvas.width, scratchCanvas.height);
+  grad.addColorStop(0, '#a6a6a6');
+  grad.addColorStop(0.5, '#d9d9d9');
+  grad.addColorStop(1, '#a6a6a6');
   ctx.fillStyle = grad;
-  ctx.fillRect(0,0,scratchCanvas.width,scratchCanvas.height);
+  ctx.fillRect(0, 0, scratchCanvas.width, scratchCanvas.height);
 
-  ctx.font = `${24*devicePixelRatio}px Poppins`;
+  ctx.font = `${28 * devicePixelRatio}px Poppins`;
   ctx.fillStyle = 'rgba(0,0,0,0.75)';
   ctx.textAlign = 'center';
-  ctx.fillText('Scratch Here', scratchCanvas.width/2, scratchCanvas.height/2 + 10);
+  ctx.fillText('Scratch Here', scratchCanvas.width / 2, scratchCanvas.height / 2 + 10 * devicePixelRatio);
+
+  ctx.globalCompositeOperation = 'destination-out';
 }
 
-function scratchAt(x,y){
-  ctx.globalCompositeOperation='destination-out';
+function scratchAt(x, y) {
+  // Smooth pressure effect
   ctx.beginPath();
-  ctx.arc(x*devicePixelRatio, y*devicePixelRatio, 30*devicePixelRatio, 0, Math.PI*2);
+  ctx.arc(x * devicePixelRatio, y * devicePixelRatio, 25 * devicePixelRatio, 0, Math.PI * 2);
   ctx.fill();
 }
 
-scratchCanvas.addEventListener('pointerdown',()=> scratching=true);
-scratchCanvas.addEventListener('pointerup',()=> scratching=false);
-scratchCanvas.addEventListener('pointermove',e=>{
-  if(!scratching) return;
-  const rect=scratchCanvas.getBoundingClientRect();
-  const x=e.clientX-rect.left;
-  const y=e.clientY-rect.top;
-  scratchAt(x,y);
+scratchCanvas.addEventListener('pointerdown', () => scratching = true);
+scratchCanvas.addEventListener('pointerup', () => scratching = false);
+scratchCanvas.addEventListener('pointermove', e => {
+  if (!scratching) return;
+  const rect = scratchCanvas.getBoundingClientRect();
+  scratchAt(e.clientX - rect.left, e.clientY - rect.top);
 });
-closeBtn.addEventListener('click',()=> overlay.style.display='none');
+closeBtn.addEventListener('click', () => overlay.style.display = 'none');
 
-video.addEventListener('ended',()=>{
-  overlay.style.display='flex';
-  setTimeout(()=> initScratch(),150);
-});
-
-// When scratch ends
-scratchCanvas.addEventListener('pointerup',()=>{
-  // Reveal reward
-  confetti({ particleCount: 100, spread: 70, origin:{y:0.7}});
-  revealedDiscount.style.display='block';
-  revealedDiscount.textContent = `🎉 You unlocked ${discount || 'a surprise reward'}!`;
-  showToast(`🎊 ${discount || 'Reward'} revealed!`);
+// ----------- Video + Overlay -----------
+video.addEventListener('ended', () => {
+  // Show overlay ONLY for first scan
+  if (isFirst) {
+    overlay.style.display = 'flex';
+    setTimeout(() => initScratch(), 150);
+  }
 });
 
-function showToast(msg){
-  toast.innerText=msg;
-  toast.style.display='block';
-  setTimeout(()=> toast.style.display='none',2500);
+// ----------- Scratch Complete -----------
+scratchCanvas.addEventListener('pointerup', () => {
+  confetti({ particleCount: 120, spread: 80, origin: { y: 0.7 } });
+  revealedDiscount.style.display = 'block';
+  revealedDiscount.textContent = discount
+    ? `🎉 You unlocked ${discount}!`
+    : `🎊 Reward unlocked!`;
+  showToast(`✨ ${discount || 'Reward'} revealed!`);
+});
+
+// ----------- Toast -----------
+function showToast(msg) {
+  toast.innerText = msg;
+  toast.style.display = 'block';
+  setTimeout(() => toast.style.display = 'none', 2500);
 }
 </script>
 </body>
