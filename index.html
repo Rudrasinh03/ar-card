@@ -17,90 +17,103 @@
       font-family:'Poppins',sans-serif;
       background:transparent;
       overflow:hidden;
+      touch-action:none;
     }
+
     #status{
       position:fixed;
       bottom:15px;
       left:50%;
       transform:translateX(-50%);
-      background:rgba(0,0,0,0.55);
-      color:#fff;
+      background:rgba(0,0,0,0.7);
+      color:#FFD700;
       padding:8px 14px;
       border-radius:10px;
       font-size:14px;
       z-index:9999;
+      box-shadow:0 0 10px rgba(255,215,0,0.4);
+      backdrop-filter:blur(10px);
       animation:fadeIn 0.5s ease;
     }
 
-    /* Overlay (hide background camera when active) */
+    /* Premium overlay (closes camera view) */
     #overlay{
       position:fixed;
       inset:0;
       display:none;
       align-items:center;
       justify-content:center;
-      backdrop-filter:blur(10px) brightness(0.8);
-      background:rgba(0,0,0,0.6);
+      background:rgba(0,0,0,0.95);
       z-index:10000;
-      animation:fadeIn 0.5s ease;
+      animation:fadeIn 0.4s ease;
+      flex-direction:column;
     }
 
-    /* Premium scratch card */
+    /* Premium scratch card box */
     #card{
       width:360px;
-      max-width:92%;
-      background:rgba(255,255,255,0.9);
-      border-radius:22px;
-      box-shadow:0 8px 35px rgba(0,0,0,0.4);
-      padding:24px;
+      max-width:90%;
+      border-radius:20px;
+      background:rgba(15,15,15,0.9);
+      border:1px solid rgba(255,215,0,0.3);
+      box-shadow:0 0 25px rgba(255,215,0,0.2), inset 0 0 15px rgba(255,215,0,0.1);
+      padding:26px;
       text-align:center;
-      position:relative;
-      backdrop-filter:blur(12px);
-      animation:popUp 0.5s ease;
+      color:#fff;
+      backdrop-filter:blur(14px);
+      animation:popUp 0.4s ease;
     }
 
     #card h2{
-      margin:0 0 10px;
       font-size:22px;
-      color:#111;
+      margin:0 0 8px;
+      background:linear-gradient(90deg,#FFD700,#FFF3B0);
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
     }
+
     #card p.sub{
-      margin:0 0 14px;
       font-size:14px;
-      color:#555;
+      color:#ccc;
+      margin:0 0 16px;
     }
+
     #scratchCanvas{
       width:100%;
       height:150px;
       border-radius:14px;
       display:block;
       cursor:crosshair;
-      box-shadow:inset 0 0 15px rgba(0,0,0,0.3);
+      touch-action:none;
+      box-shadow:inset 0 0 20px rgba(255,215,0,0.2);
     }
+
     #closeBtn{
       position:absolute;
       top:10px;
       right:12px;
       background:none;
       border:none;
-      font-size:20px;
+      font-size:22px;
       cursor:pointer;
-      color:#333;
+      color:#FFD700;
     }
 
-    /* Toast */
+    /* Toast (Gold shimmer) */
     #toast{
       position:fixed;
-      top:16px;
+      top:18px;
       left:50%;
       transform:translateX(-50%);
       background:rgba(0,0,0,0.8);
-      color:#fff;
-      padding:12px 18px;
+      color:#FFD700;
+      padding:12px 20px;
       border-radius:12px;
       display:none;
       font-size:14px;
       z-index:10001;
+      box-shadow:0 0 20px rgba(255,215,0,0.4);
+      backdrop-filter:blur(8px);
       animation:fadeIn 0.3s ease;
     }
 
@@ -119,8 +132,8 @@
   <div id="overlay">
     <div id="card">
       <button id="closeBtn">✕</button>
-      <h2>🎁 You’ve Earned a Reward!</h2>
-      <p class="sub">Scratch below to see what you’ve unlocked</p>
+      <h2>🎁 Luxury Reward Unlocked!</h2>
+      <p class="sub">Scratch the gold foil to reveal your offer</p>
       <canvas id="scratchCanvas"></canvas>
     </div>
   </div>
@@ -153,7 +166,7 @@ const closeBtn = document.getElementById('closeBtn');
 const toast = document.getElementById('toast');
 
 document.querySelector('a-scene').addEventListener('arReady', ()=> {
-  status.innerText='✅ Ready — point camera at your card';
+  status.innerText='✅ Ready — point your camera at your card';
 });
 document.querySelector('a-scene').addEventListener('targetFound', async ()=>{
   status.innerText='🎬 Target found — video playing';
@@ -175,15 +188,17 @@ function initScratch(){
   scratchCanvas.height = 150 * devicePixelRatio;
   ctx = scratchCanvas.getContext('2d');
 
+  // GOLD metallic gradient
   const grad = ctx.createLinearGradient(0,0,scratchCanvas.width,scratchCanvas.height);
-  grad.addColorStop(0,'#b0b0b0');
-  grad.addColorStop(0.5,'#dcdcdc');
-  grad.addColorStop(1,'#a0a0a0');
+  grad.addColorStop(0,'#7a6020');
+  grad.addColorStop(0.3,'#b49438');
+  grad.addColorStop(0.6,'#fce79b');
+  grad.addColorStop(1,'#b49438');
   ctx.fillStyle = grad;
   ctx.fillRect(0,0,scratchCanvas.width,scratchCanvas.height);
 
-  ctx.font = `${24*devicePixelRatio}px Poppins`;
-  ctx.fillStyle = 'rgba(0,0,0,0.75)';
+  ctx.font = `${26*devicePixelRatio}px Poppins`;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.textAlign = 'center';
   ctx.fillText('Scratch Here', scratchCanvas.width/2, scratchCanvas.height/2 + 10);
 }
@@ -195,8 +210,15 @@ function scratchAt(x,y){
   ctx.fill();
 }
 
-scratchCanvas.addEventListener('pointerdown',()=> scratching=true);
-scratchCanvas.addEventListener('pointerup',()=> scratching=false);
+// smoother touch (no screen shake)
+scratchCanvas.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  scratching=true;
+});
+scratchCanvas.addEventListener('pointerup',e=>{
+  e.preventDefault();
+  scratching=false;
+});
 scratchCanvas.addEventListener('pointermove',e=>{
   if(!scratching) return;
   const rect=scratchCanvas.getBoundingClientRect();
@@ -208,10 +230,12 @@ closeBtn.addEventListener('click',()=> overlay.style.display='none');
 
 video.addEventListener('ended',()=>{
   if(isFirst){
+    // hide AR background
+    document.querySelector('a-scene').style.display='none';
     overlay.style.display='flex';
-    setTimeout(()=> initScratch(),120);
+    setTimeout(()=> initScratch(),200);
   }else{
-    showToast('👋 Welcome back — only AR video shown.');
+    showToast('👋 Welcome back — AR video only this time.');
   }
 });
 
@@ -224,8 +248,13 @@ function showToast(msg){
 // Reveal discount
 scratchCanvas.addEventListener('pointerup',()=>{
   overlay.style.display='none';
-  confetti({ particleCount: 100, spread: 70, origin:{y:0.7}});
-  showToast(`🎉 You unlocked ${discount || 'a reward'}!`);
+  confetti({
+    particleCount: 120,
+    spread: 70,
+    origin:{y:0.7},
+    colors:['#FFD700','#FFF3B0','#FFDF00']
+  });
+  showToast(`🎉 You unlocked ${discount || 'your reward'}!`);
 });
 </script>
 </body>
