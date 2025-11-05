@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>AR Video Creator View (Ultra Stable + Logo Pause)</title>
+    <title>AR Experience — Premium Reward</title>
 
     <!-- A-Frame + MindAR -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -14,61 +14,71 @@
         margin: 0;
         height: 100%;
         overflow: hidden;
-        background: transparent;
+        background: #000;
+        font-family: 'Poppins', sans-serif;
       }
 
       #status {
         position: fixed;
-        bottom: 10px;
+        bottom: 12px;
         left: 50%;
         transform: translateX(-50%);
-        color: white;
-        font-family: "Poppins", sans-serif;
-        background: rgba(0, 0, 0, 0.5);
-        padding: 6px 12px;
-        border-radius: 8px;
-        z-index: 9999;
+        color: #ffd700;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 8px 16px;
+        border-radius: 10px;
+        backdrop-filter: blur(8px);
         font-size: 14px;
-      }
-
-      #watermark {
-        position: fixed;
-        bottom: 16px;
-        right: 16px;
-        color: #fff;
-        font-family: "Poppins", sans-serif;
-        font-size: 12px;
-        opacity: 0.8;
-        background: rgba(0, 0, 0, 0.3);
-        padding: 4px 8px;
-        border-radius: 6px;
-        backdrop-filter: blur(3px);
         z-index: 9999;
+        text-shadow: 0 0 8px #ffd700;
       }
 
-      #logoLink {
+      /* Premium scratch card overlay */
+      #scratchCardContainer {
         position: fixed;
-        top: 14px;
-        right: 14px;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        background: radial-gradient(circle at center, #111 60%, #000 100%);
         z-index: 10000;
-        cursor: pointer;
-        background: rgba(0, 0, 0, 0.3);
-        padding: 6px;
-        border-radius: 50%;
-        transition: all 0.2s ease-in-out;
-        backdrop-filter: blur(3px);
+        animation: fadeIn 0.6s ease-in-out forwards;
       }
 
-      #logoLink:hover {
-        background: rgba(255, 255, 255, 0.2);
-        transform: scale(1.1);
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
       }
 
-      #logoLink img {
-        height: 30px;
-        width: 30px;
-        border-radius: 50%;
-        display: block;
+      #scratchCard {
+        width: 300px;
+        height: 180px;
+        background: linear-gradient(145deg, #000, #1a1a1a);
+        border: 1px solid rgba(255, 215, 0, 0.5);
+        border-radius: 16px;
+        position: relative;
+        box-shadow: 0 0 30px rgba(255, 215, 0, 0.25);
+        overflow: hidden;
+      }
+
+      canvas#scratchLayer {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 16px;
+      }
+
+      #discountText {
+        color: #ffd700;
+        font-size: 24px;
+        text-align: center;
+        font-weight: 600;
+        text-shadow: 0 0 10px #ffd700;
+        padding-top: 65px;
       }
     </style>
   </head>
@@ -76,49 +86,32 @@
   <body>
     <div id="status">📷 Initializing camera...</div>
 
-    <!-- Top-right clickable logo -->
-    <div id="logoLink">
-      <img src="logo.jpeg" alt="Website Logo" />
-    </div>
-
-    <!-- Watermark -->
-    <div id="watermark">© 2025 CreatorView</div>
-
+    <!-- AR Scene -->
     <a-scene
-      mindar-image="imageTargetSrc: targets (1).mind; autoStart: true;"
+      mindar-image="imageTargetSrc: targets.mind; autoStart: true;"
       color-space="sRGB"
-      renderer="colorManagement: true; physicallyCorrectLights: false; alpha: true;"
+      renderer="colorManagement: true; alpha: true;"
       vr-mode-ui="enabled: false"
-      device-orientation-permission-ui="enabled: false"
       embedded
     >
       <a-assets>
-        <video
-          id="myVideo"
-          src="thank_you.mp4"
-          loop
-          muted
-          preload="auto"
-          playsinline
-          webkit-playsinline
-          crossorigin="anonymous"
-        ></video>
+        <video id="myVideo" src="sample.mp4" loop muted preload="auto" playsinline></video>
       </a-assets>
 
       <a-camera look-controls="enabled: false"></a-camera>
 
       <a-entity mindar-image-target="targetIndex: 0" id="target">
-        <a-video
-          id="videoPlane"
-          src="#myVideo"
-          width="1"
-          height="0.56"
-          position="0 0 0.01"
-          visible="false"
-          material="shader: flat; opacity: 1;"
-        ></a-video>
+        <a-video id="videoPlane" src="#myVideo" width="1" height="0.56" position="0 0 0.01" visible="false"></a-video>
       </a-entity>
     </a-scene>
+
+    <!-- Scratch Card UI -->
+    <div id="scratchCardContainer">
+      <div id="scratchCard">
+        <div id="discountText">🎁 30% OFF</div>
+        <canvas id="scratchLayer"></canvas>
+      </div>
+    </div>
 
     <script>
       const scene = document.querySelector("a-scene");
@@ -126,47 +119,43 @@
       const plane = document.querySelector("#videoPlane");
       const target = document.querySelector("#target");
       const status = document.getElementById("status");
-      const logo = document.getElementById("logoLink");
+
+      const scratchCardContainer = document.getElementById("scratchCardContainer");
+      const scratchLayer = document.getElementById("scratchLayer");
+      const discountText = document.getElementById("discountText");
 
       let targetVisible = false;
+      let hasShownScratch = false;
 
-      // Auto resize
+      // Setup video dimensions
       video.addEventListener("loadedmetadata", () => {
         const aspect = video.videoWidth / video.videoHeight;
         plane.setAttribute("width", 1);
         plane.setAttribute("height", 1 / aspect);
       });
 
-      // Click to enable sound
-      document.body.addEventListener("click", () => {
-        if (targetVisible) {
-          video.muted = false;
-          video.play();
-          status.innerText = "🔊 Sound On";
-        }
-      });
-
-      // ✅ When logo clicked → pause video first, then open link
-      logo.addEventListener("click", (e) => {
-        e.stopPropagation(); // prevent triggering AR tap
-        if (!video.paused) {
-          video.pause();
-          status.innerText = "⏸️ Video paused for link";
-        }
-        window.open("https://in.pinterest.com/", "_blank");
-      });
-
+      // AR Events
       scene.addEventListener("arReady", () => {
-        status.innerText = "✅ Point camera at your image target";
+        status.innerText = "✅ Point your camera at the card";
       });
 
       scene.addEventListener("targetFound", async () => {
         targetVisible = true;
-        status.innerText = "🎬 Target found — tap to enable audio";
+        status.innerText = "🎬 Target found — video starting...";
         plane.setAttribute("visible", true);
-        try {
-          await video.play();
-        } catch {}
+        try { await video.play(); } catch {}
+        
+        // After 10 seconds, show scratch card
+        if (!hasShownScratch) {
+          setTimeout(() => {
+            if (targetVisible) {
+              showScratchCard();
+              hasShownScratch = true;
+              video.pause();
+              plane.setAttribute("visible", false);
+            }
+          }, 10000);
+        }
       });
 
       scene.addEventListener("targetLost", () => {
@@ -176,28 +165,49 @@
         plane.setAttribute("visible", false);
       });
 
-      // Ultra-smooth stabilization
-      let smoothedPos = new THREE.Vector3();
-      let smoothedRot = new THREE.Euler();
+      // Scratch Logic
+      function showScratchCard() {
+        scratchCardContainer.style.display = "flex";
+        const ctx = scratchLayer.getContext("2d");
+        scratchLayer.width = scratchLayer.offsetWidth;
+        scratchLayer.height = scratchLayer.offsetHeight;
 
-      AFRAME.registerComponent("ultra-stable", {
-        tick: function () {
-          if (!targetVisible) return;
+        // gold shimmer cover
+        const gradient = ctx.createLinearGradient(0, 0, scratchLayer.width, scratchLayer.height);
+        gradient.addColorStop(0, "#333");
+        gradient.addColorStop(1, "#222");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, scratchLayer.width, scratchLayer.height);
 
-          const pos = target.object3D.position;
-          const rot = target.object3D.rotation;
+        ctx.globalCompositeOperation = "destination-out";
 
-          smoothedPos.lerp(pos, 0.08);
-          smoothedRot.x += (rot.x - smoothedRot.x) * 0.08;
-          smoothedRot.y += (rot.y - smoothedRot.y) * 0.08;
-          smoothedRot.z += (rot.z - smoothedRot.z) * 0.08;
+        let scratching = false;
 
-          plane.object3D.position.copy(smoothedPos);
-          plane.object3D.rotation.copy(smoothedRot);
-        }
-      });
+        const start = e => { scratching = true; draw(e); };
+        const end = () => { scratching = false; };
+        const move = e => { if (scratching) draw(e); };
 
-      plane.setAttribute("ultra-stable", "");
+        const getPos = e => {
+          const rect = scratchLayer.getBoundingClientRect();
+          const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+          const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+          return { x, y };
+        };
+
+        const draw = e => {
+          const pos = getPos(e);
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 20, 0, Math.PI * 2);
+          ctx.fill();
+        };
+
+        scratchLayer.addEventListener("mousedown", start);
+        scratchLayer.addEventListener("mouseup", end);
+        scratchLayer.addEventListener("mousemove", move);
+        scratchLayer.addEventListener("touchstart", start);
+        scratchLayer.addEventListener("touchend", end);
+        scratchLayer.addEventListener("touchmove", move);
+      }
     </script>
   </body>
 </html>
